@@ -1,27 +1,43 @@
 import express from "express";
 import dotenv from "dotenv";
-import sendSMS from "./smsService.js";
+import { generateOTP, storeOTP, verifyOTP } from "./otpService.js";
+import { sendOTP } from "./smsService.js";
 
 dotenv.config();
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(express.json());
 
-app.post("/send-sms", async (req, res) => {
-    const { mobile, message } = req.body;
+// Route to send OTP
+app.post("/send-otp", async (req, res) => {
+    const { mobile } = req.body;
 
-    if (!mobile || !message) {
-        return res.status(400).json({ error: "Mobile number and message are required" });
+    if (!mobile) {
+        return res.status(400).json({ error: "Mobile number is required" });
     }
+
+    const otp = generateOTP();
+    storeOTP(mobile, otp);
 
     try {
-        const response = await sendSMS(mobile, message);
-        res.status(200).json({ success: true, response });
+        await sendOTP(mobile, otp);
+        res.status(200).json({ success: true, message: "OTP sent successfully" });
     } catch (error) {
-        res.status(500).json({ error: "Failed to send SMS", details: error.message });
+        res.status(500).json({ error: "Failed to send OTP", details: error.message });
     }
+});
+
+// Route to verify OTP
+app.post("/verify-otp", (req, res) => {
+    const { mobile, otp } = req.body;
+
+    if (!mobile || !otp) {
+        return res.status(400).json({ error: "Mobile number and OTP are required" });
+    }
+
+    const verificationResult = verifyOTP(mobile, otp);
+    res.status(200).json(verificationResult);
 });
 
 app.listen(PORT, () => {
